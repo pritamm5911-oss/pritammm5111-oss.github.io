@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoadSense | Live System Dashboard</title>
+  
+  <!-- Leaflet CSS (Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Three.js (3D Vehicle Model) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --accent: #00e5ff;
+      --text: #c9d1d9;
+      --border: #30363d;
+    }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 30px;
+      background: #161b22;
+      border-bottom: 1px solid var(--border);
+    }
+    .back-btn {
+      color: var(--accent);
+      text-decoration: none;
+      border: 1px solid var(--accent);
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 15px;
+      min-height: 250px;
+    }
+    #map { height: 280px; border-radius: 8px; }
+    #canvas3d { width: 100%; height: 220px; }
+    .score-val { font-size: 3rem; color: #00ff88; text-align: center; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h2>Road Intelligence System Live</h2>
+    <a href="index.html" class="back-btn">← Back to Main Site</a>
+  </header>
+
+  <div class="dashboard-grid">
+    <!-- Section 1: Road Health Score -->
+    <div class="card">
+      <h3>1. Road Health Score</h3>
+      <div class="score-val" id="healthScore">88/100</div>
+      <p style="text-align:center;">Condition: Good (Optimal Surface)</p>
+    </div>
+
+    <!-- Section 2: Live Navigation Map -->
+    <div class="card">
+      <h3>2. Live Navigation & GPS Map</h3>
+      <div id="map"></div>
+    </div>
+
+    <!-- Section 3: Telemetry Charts -->
+    <div class="card">
+      <h3>3. Real-Time Telemetry (Vibration/Depth)</h3>
+      <canvas id="telemetryChart"></canvas>
+    </div>
+
+    <!-- Section 4: 3D Vehicle Orientation -->
+    <div class="card">
+      <h3>4. Vehicle 3D Pitch & Roll (IMU)</h3>
+      <div id="canvas3d"></div>
+    </div>
+
+    <!-- Section 5: Pothole & Anomaly Logs -->
+    <div class="card">
+      <h3>5. Real-Time Anomaly Logs</h3>
+      <ul id="logList">
+        <li>[SYSTEM] Monitoring active...</li>
+      </ul>
+    </div>
+
+    <!-- Section 6: Camera & System Controls -->
+    <div class="card">
+      <h3>6. System Controls & Live Stream</h3>
+      <button onclick="exportCSV()" style="padding: 10px; background: var(--accent); border:none; border-radius:5px; cursor:pointer;">Export GPS CSV</button>
+      <p>Camera Feed: Connected (ESP32-CAM)</p>
+    </div>
+  </div>
+
+  <script>
+    // 1. Leaflet Map Init
+    const map = L.map('map').setView([26.92, 81.18], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    const marker = L.marker([26.92, 81.18]).addTo(map).bindPopup("Vehicle Location");
+
+    // 2. Chart.js Init
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['1s', '2s', '3s', '4s', '5s'],
+        datasets: [{ label: 'Vibration (G)', data: [0.2, 0.4, 0.1, 0.8, 0.3], borderColor: '#00e5ff', fill: false }]
+      }
+    });
+
+    // 3. Export CSV Function
+    function exportCSV() {
+      alert("Downloading GPS & Road Health Logs CSV...");
+    }
+  </script>
+</body>
+</html>

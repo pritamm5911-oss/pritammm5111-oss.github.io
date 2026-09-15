@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROAD-SENSE // NavIC Precision Live Dashboard Studio</title>
+  
+  <!-- LEAFLET MAPS, CHART.JS & THREE.JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Orbitron:wght@600;800;900&family=Inter:wght@400;600;700&display=swap');
+
+    :root {
+      --bg-dark: #030712;
+      --card-bg: rgba(11, 19, 36, 0.88);
+      --glass-border: rgba(0, 242, 254, 0.22);
+      --neon-cyan: #00f2fe;
+      --neon-blue: #38bdf8;
+      --neon-purple: #a855f7;
+      --neon-green: #10b981;
+      --neon-yellow: #f59e0b;
+      --neon-orange: #f97316;
+      --neon-red: #ef4444;
+      --text-main: #f1f5f9;
+      --text-mute: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+
+    body {
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.05) 0%, transparent 40%);
+      color: var(--text-main);
+      padding: 12px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* HEADER HUD */
+    header {
+      background: rgba(8, 14, 27, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    }
+
+    .brand {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 900;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-blue), var(--neon-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-mute);
+    }
+    .status-item { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+    .status-val { color: var(--neon-cyan); font-weight: 800; }
+
+    .header-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    .btn {
+      background: linear-gradient(135deg, #0284c7, #1d4ed8);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 0 15px rgba(0, 242, 254, 0.5); }
+    .btn-alt { background: rgba(15, 23, 42, 0.9); border: 1px solid var(--glass-border); color: #cbd5e1; }
+    .btn-danger { background: linear-gradient(135deg, #dc2626, #991b1b); }
+    .btn-reset { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
+
+    /* LAYOUT GRID */
+    main {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+    }
+
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-5 { grid-column: span 5; }
+    .col-7 { grid-column: span 7; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+
+    @media (max-width: 1100px) {
+      .col-3, .col-4, .col-5, .col-7, .col-8 { grid-column: span 12; }
+    }
+
+    /* CARD STYLING */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    .card-section-tag {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 800;
+      color: var(--neon-purple);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 2px;
+    }
+
+    .card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--neon-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* MAP STYLING & HUD */
+    #map { width: 100%; height: 280px; border-radius: 10px; z-index: 1; border: 1px solid rgba(255, 255, 255, 0.08); }
+    
+    .map-controls { display: flex; gap: 4px; background: rgba(3, 7, 18, 0.7); padding: 3px; border-radius: 8px; }
+    .map-btn {
+      background: transparent; border: none; color: var(--text-mute);
+      padding: 3px 8px; border-radius: 6px; font-size: 0.62rem; cursor: pointer; font-weight: 800; font-family: 'Orbitron', sans-serif;
+    }
+    .map-btn.active { background: var(--neon-cyan); color: #020617; box-shadow: 0 0 10px rgba(0, 242, 254, 0.4); }
+
+    .map-legend {
+      margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+      font-size: 0.63rem; background: rgba(3, 7, 18, 0.6); padding: 6px 10px; border-radius: 8px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; color: var(--text-mute); font-weight: 600; }
+    .legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+    /* TABLES & DATA LISTS */
+    .info-list { display: flex; flex-direction: column; gap: 6px; }
+    .info-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 8px; background: rgba(3, 7, 18, 0.6); border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.7rem;
+    }
+    .info-label { color: var(--text-mute); font-weight: 600; }
+    .info-val { font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--neon-cyan); }
+
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; margin-top: 4px; }
+    .mini-table th { color: var(--text-mute); text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: 'Orbitron', sans-serif; font-size: 0.58rem; }
+    .mini-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); font-family: 'JetBrains Mono', monospace; }
+
+    /* ESP32 CAM & RADAR */
+    .cam-box {
+      width: 100%; height: 170px; background: #010409; border-radius: 10px;
+      border: 1px solid rgba(0, 242, 254, 0.25); position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cam-img { width: 100%; height: 100%; object-fit: cover; display: none; }
+
+    #radarUi { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .radar-sweep {
+      position: absolute; width: 120px; height: 120px; border-radius: 50%;
+      border: 1px solid rgba(0, 242, 254, 0.35);
+      background: conic-gradient(from 0deg, rgba(0, 242, 254, 0.4), transparent 60deg);
+      animation: spinRadar 2.5s linear infinite;
+    }
+    .radar-crosshair {
+      position: absolute; width: 100%; height: 100%;
+      background: 
+        linear-gradient(to right, transparent 49.5%, rgba(0, 242, 254, 0.18) 50%, transparent 50.5%),
+        linear-gradient(to bottom, transparent 49.5%, rgba(0, 242, 254, 0.18) 50%, transparent 50.5%);
+    }
+    .radar-text {
+      position: absolute; z-index: 2; font-size: 0.6rem; font-family: 'Orbitron', sans-serif;
+      color: var(--neon-cyan); letter-spacing: 1px; font-weight: 800;
+      background: rgba(3, 7, 18, 0.85); padding: 3px 8px; border-radius: 6px;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+    }
+    @keyframes spinRadar { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .cam-controls-panel {
+      margin-top: 8px; background: rgba(3, 7, 18, 0.6); border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .ip-input-group { display: flex; gap: 6px; }
+    .ip-input {
+      flex: 1; background: rgba(0,0,0,0.7); border: 1px solid var(--glass-border);
+      color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 0.72rem; font-family: 'JetBrains Mono', monospace; outline: none;
+    }
+
+    .gimbal-panel {
+      margin-top: 6px; background: rgba(3, 7, 18, 0.6); border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px; padding: 6px 8px;
+    }
+    .servo-row { margin-bottom: 4px; }
+    .servo-label { font-size: 0.62rem; color: var(--text-mute); display: flex; justify-content: space-between; font-weight: 700; }
+    .servo-label span { color: var(--neon-cyan); font-family: 'JetBrains Mono', monospace; }
+    input[type=range] { width: 100%; height: 4px; background: #1e293b; border-radius: 4px; accent-color: var(--neon-cyan); }
+
+    /* SENSORS & GRAPH UI */
+    .sensor-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+    .sensor-box {
+      background: rgba(3, 7, 18, 0.7); border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 6px; border-radius: 8px; text-align: center;
+    }
+    .sensor-box-title { font-size: 0.58rem; color: var(--text-mute); text-transform: uppercase; font-family: 'Orbitron', sans-serif; }
+    .sensor-box-val { font-size: 0.95rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--neon-cyan); margin-top: 1px; }
+
+    .chart-box { width: 100%; height: 110px; position: relative; background: rgba(2, 6, 23, 0.8); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 4px; }
+    #orientation3d { width: 100%; height: 130px; border-radius: 8px; background: #010409; position: relative; overflow: hidden; }
+
+    /* SCOPE OUTPUT GAUGE */
+    .rhi-container { display: flex; align-items: center; justify-content: space-around; padding: 6px 0; }
+    .rhi-gauge {
+      position: relative; width: 90px; height: 90px; border-radius: 50%;
+      background: conic-gradient(rgba(255,255,255,0.08) 0deg 360deg);
+      display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s ease;
+    }
+    .rhi-inner {
+      width: 68px; height: 68px; background: #030712; border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--glass-border);
+    }
+    .rhi-score { font-size: 1.3rem; font-weight: 900; font-family: 'Orbitron', sans-serif; color: var(--text-mute); }
+
+    /* LOG TABLE */
+    .log-box { max-height: 140px; overflow-y: auto; border-radius: 8px; background: rgba(3, 7, 18, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.65rem; text-align: left; }
+    th { padding: 5px 8px; color: var(--text-mute); background: rgba(15, 23, 42, 0.95); position: sticky; top: 0; font-family: 'Orbitron', sans-serif; font-size: 0.58rem; }
+    td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-family: 'JetBrains Mono', monospace; }
+
+    .sev-good { color: var(--neon-green); }
+    .sev-fair { color: var(--neon-yellow); }
+    .sev-poor { color: var(--neon-orange); }
+    .sev-bad { color: var(--neon-red); font-weight: bold; }
+
+    /* MODAL */
+    #simStudioView { display: none; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(12px); z-index: 99999; padding: 20px; }
+    .studio-container { max-width: 480px; margin: 40px auto; background: var(--card-bg); border: 1px solid var(--neon-cyan); border-radius: 16px; padding: 18px; }
+    .input-field { margin-bottom: 8px; }
+    .input-field label { display: block; font-size: 0.65rem; color: var(--text-mute); margin-bottom: 3px; font-weight: 700; font-family: 'Orbitron', sans-serif; }
+    .input-field input { width: 100%; background: rgba(3, 7, 18, 0.9); border: 1px solid var(--glass-border); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; outline: none; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER HUD -->
+  <header>
+    <div class="brand">
+      <span>🛰️</span> ROAD-SENSE // NavIC REALTIME STUDIO
+    </div>
+    
+    <div class="status-bar">
+      <div class="status-item">NavIC GNSS: <span id="gnssStatus" class="status-val">Standby 🛰️</span></div>
+      <div class="status-item">Time: <span id="headerTime" class="status-val">--:--:--</span></div>
+      <div class="status-item">Battery: <span id="batteryVal" class="status-val">Reading... 🔋</span></div>
+    </div>
+
+    <div class="header-btns">
+      <button class="btn btn-alt" onclick="openStudioView()">⚙️ Config</button>
+      <button id="simToggleBtn" class="btn" onclick="toggleSimulation()">🚀 Launch Simulation</button>
+      <button class="btn btn-reset" onclick="resetAllDashboardData()">🔄 Reset All</button>
+      <button class="btn btn-alt" onclick="exportGPSCSV()">📥 Export CSV</button>
+    </div>
+  </header>
+
+  <main>
+    
+    <!-- SECTION 1: ROAD HEALTH MAP -->
+    <div class="glass-card col-5">
+      <div class="card-section-tag">SECTION 1 // MAIN MAP & LOCATION</div>
+      <div class="card-title">
+        <span>🗺️ Road Health Map (NavIC)</span>
+        <div class="map-controls">
+          <button id="btnMapCity" class="map-btn active" onclick="switchMapLayer('city')">City</button>
+          <button id="btnMapSat" class="map-btn" onclick="switchMapLayer('sat')">Satellite</button>
+          <button id="btnMapSurvey" class="map-btn" onclick="switchMapLayer('survey')">Survey</button>
+          <button class="map-btn" style="background: rgba(0, 242, 254, 0.2); color: var(--neon-cyan);" onclick="locateUserPosition()">🎯 My Location</button>
+        </div>
+      </div>
+      
+      <div id="map"></div>
+      
+      <div style="margin-top: 6px; font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; color: var(--text-mute); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+        <span>Live Pos: <b id="gpsCoordText" style="color: var(--neon-cyan);">-- N, -- E</b></span>
+        <span>Compass Heading: <b id="compassHeadingText" style="color: var(--neon-yellow);">0° (N)</b></span>
+        <span>Segment: <b style="color: var(--neon-purple);">B-204</b></span>
+      </div>
+
+      <div class="map-legend">
+        <div class="legend-item"><span class="legend-dot" style="background: var(--neon-green);"></span> Healthy</div>
+        <div class="legend-item"><span class="legend-dot" style="background: var(--neon-yellow);"></span> Attention</div>
+        <div class="legend-item"><span class="legend-dot" style="background: var(--neon-orange);"></span> Inspection</div>
+        <div class="legend-item"><span class="legend-dot" style="background: var(--neon-red);"></span> High Priority</div>
+        <div class="legend-item"><span class="legend-dot" style="background: var(--neon-cyan);"></span> Rover Vehicle</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #a855f7;"></span> Anomaly Event</div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: ROAD SEGMENT DETAILS -->
+    <div class="glass-card col-3">
+      <div class="card-section-tag">SECTION 2 // ROAD ANALYTICS</div>
+      <div class="card-title">
+        <span>📍 Segment Analytics</span>
+        <button class="btn btn-alt" style="padding: 2px 6px; font-size: 0.55rem;" onclick="resetSection2()">🔄 Reset</button>
+      </div>
+
+      <div class="info-list" style="margin-bottom: 8px;">
+        <div class="info-row"><span class="info-label">Active Segment ID</span><span class="info-val">Segment: B-204</span></div>
+        <div class="info-row"><span class="info-label">Live Segment Score</span><span id="liveSegmentScore" class="info-val" style="color: var(--text-mute);">-- / 100</span></div>
+        <div class="info-row"><span class="info-label">AI Confidence Index</span><span id="liveConfidence" class="info-val">--</span></div>
+        <div class="info-row"><span class="info-label">Road Condition Trend</span><span id="liveTrend" class="info-val" style="color: var(--text-mute);">Standby ⏸️</span></div>
+        <div class="info-row"><span class="info-label">Total Observations</span><span id="totalObsCount" class="info-val">0 Records</span></div>
+      </div>
+
+      <div class="card-title" style="margin-top: 2px; margin-bottom: 4px; font-size: 0.68rem;">
+        <span>🚨 Dynamic Event Stream</span>
+      </div>
+      
+      <table class="mini-table">
+        <thead>
+          <tr><th>Segment</th><th>Type</th><th>Dist.</th><th>Score</th></tr>
+        </thead>
+        <tbody id="recentEventsBody">
+          <tr><td colspan="4" style="text-align: center; color: var(--text-mute);">No live telemetry events</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- HARDWARE SECTION: ESP32-CAM & GIMBAL -->
+    <div class="glass-card col-4">
+      <div class="card-section-tag">SECTION 3 // HARDWARE & STREAM</div>
+      <div class="card-title">
+        <span>🎥 ESP32-CAM Live Feed</span>
+        <span id="camStatusBadge" style="color: var(--neon-cyan); font-size: 0.6rem;">● RADAR ACTIVE</span>
+      </div>
+      
+      <div class="cam-box" id="camBox">
+        <img id="espCamStream" class="cam-img" src="" alt="Live Stream" onerror="onStreamError()">
+        <div id="radarUi">
+          <div class="radar-crosshair"></div>
+          <div class="radar-sweep"></div>
+          <div class="radar-text">📡 TELEMETRY RADAR ACTIVE</div>
+        </div>
+      </div>
+
+      <div class="cam-controls-panel">
+        <div class="ip-input-group">
+          <input type="text" id="camIpInput" class="ip-input" placeholder="Enter IP (e.g. 192.168.4.1)">
+          <button class="btn" style="padding: 3px 8px; font-size: 0.62rem;" onclick="connectEspCam()">Connect</button>
+          <button class="btn btn-alt btn-danger" style="padding: 3px 6px; font-size: 0.62rem;" onclick="stopCamStream()">Stop</button>
+        </div>
+      </div>
+
+      <div class="gimbal-panel">
+        <div class="servo-row">
+          <div class="servo-label"><span>📐 PAN (SERVO 1)</span><span id="panDegreeVal">90°</span></div>
+          <input type="range" id="panSlider" min="0" max="180" value="90" oninput="onPanTiltChange()">
+        </div>
+        <div class="servo-row">
+          <div class="servo-label"><span>📐 TILT (SERVO 2)</span><span id="tiltDegreeVal">45°</span></div>
+          <input type="range" id="tiltSlider" min="0" max="180" value="45" oninput="onPanTiltChange()">
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: LIVE SENSORS & 3D MODEL -->
+    <div class="glass-card col-4">
+      <div class="card-section-tag">SECTION 4 // LIVE SENSORS & 3D GYRO</div>
+      <div class="card-title">
+        <span>📉 IMU Sensors & 3D Model</span>
+        <button class="btn btn-alt" style="padding: 2px 6px; font-size: 0.55rem;" onclick="resetSection4()">🔄 Reset</button>
+      </div>
+
+      <div class="sensor-cards">
+        <div class="sensor-box">
+          <div class="sensor-box-title">Vibration IMU</div>
+          <div class="sensor-box-val" id="valVibe">0.00 g</div>
+        </div>
+        <div class="sensor-box">
+          <div class="sensor-box-title">Temperature</div>
+          <div class="sensor-box-val" id="valTemp" style="color: var(--neon-yellow);">-- °C</div>
+        </div>
+        <div class="sensor-box">
+          <div class="sensor-box-title">GPS Speed</div>
+          <div class="sensor-box-val" id="valSpeed" style="color: var(--neon-green);">0 km/h</div>
+        </div>
+        <div class="sensor-box">
+          <div class="sensor-box-title">Gyrometer</div>
+          <div class="sensor-box-val" id="valGyro" style="color: var(--neon-purple);">0° / 0°</div>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <canvas id="vibeChartCanvas"></canvas>
+      </div>
+
+      <div style="margin-top: 6px;">
+        <div class="card-title" style="font-size: 0.65rem; margin-bottom: 3px;"><span>🔄 Live 3D Rover Orientation</span></div>
+        <div id="orientation3d"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 5: SYSTEM SCOPE OUTPUT -->
+    <div class="glass-card col-8">
+      <div class="card-section-tag">SECTION 5 // SYSTEM SCOPE OUTPUT</div>
+      <div class="card-title">
+        <span>📊 Road Health Gauge & Overall Scope</span>
+        <button class="btn btn-alt" style="padding: 2px 6px; font-size: 0.55rem;" onclick="resetSection5()">🔄 Reset Gauge</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;">
+        
+        <div class="rhi-container">
+          <div id="rhiGauge" class="rhi-gauge">
+            <div class="rhi-inner">
+              <div id="rhiVal" class="rhi-score">--</div>
+              <div style="font-size: 0.55rem; color: var(--text-mute);">/100</div>
+            </div>
+          </div>
+          
+          <div style="font-size: 0.65rem; display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace;">
+            <div><span style="color:var(--neon-green);">🟢 Healthy:</span> <b id="pctHealthy">0%</b></div>
+            <div><span style="color:var(--neon-yellow);">🟡 Attention:</span> <b id="pctFair">0%</b></div>
+            <div><span style="color:var(--neon-orange);">🟧 Inspection:</span> <b id="pctPoor">0%</b></div>
+            <div><span style="color:var(--neon-red);">🔴 Priority:</span> <b id="pctBad">0%</b></div>
+          </div>
+        </div>
+
+        <div class="info-list">
+          <div class="info-row">
+            <span class="info-label">NavIC Receiver</span>
+            <span class="info-val" id="navicRecvState" style="color:var(--neon-yellow);">Standby 🟡</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Processing Engine</span>
+            <span class="info-val" id="procEngState" style="color:var(--neon-cyan);">Ready ⚡</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Storage Capacity</span>
+            <span class="info-val">100% Free</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Telemetry Pipeline</span>
+            <span class="info-val" id="telemetryPipeState" style="color:var(--text-mute);">Idle ⏸️</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION 6: GEO-TAGGED DISTRESS LOG -->
+    <div class="glass-card col-12">
+      <div class="card-section-tag">SECTION 6 // LIVE DISTRESS LOG</div>
+      <div class="card-title">
+        <span>📋 GPS Geo-Tagged Distress Log (Realtime Stream)</span>
+        <button class="btn btn-alt" style="padding: 2px 6px; font-size: 0.55rem;" onclick="resetSection6()">🔄 Clear Log Table</button>
+      </div>
+
+      <div class="log-box">
+        <table id="potholeTable">
+          <thead>
+            <tr><th>Timestamp</th><th>NavIC GPS Lat / Lng</th><th>Pothole Depth</th><th>Vibration Spike</th><th>Road Score</th><th>Category Status</th></tr>
+          </thead>
+          <tbody>
+            <tr id="emptyRowPlaceholder"><td colspan="6" style="text-align:center; color:var(--text-mute);">Log is empty. Start simulation or live ESP32 GPS connection to populate.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- CONFIG MODAL -->
+  <div id="simStudioView">
+    <div class="studio-container">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="color: var(--neon-cyan); font-family: 'Orbitron', sans-serif; font-size: 0.9rem;">⚙️ SIMULATION CONFIG</h3>
+        <button class="btn btn-alt" onclick="closeStudioView()">⬅️ Close</button>
+      </div>
+
+      <div class="input-field"><label>🗺️ Starting Latitude</label><input type="number" id="cfgLat" value="28.6139" step="0.0001"></div>
+      <div class="input-field"><label>🗺️ Starting Longitude</label><input type="number" id="cfgLng" value="77.2090" step="0.0001"></div>
+      <div class="input-field"><label>🕳️ Max Depth (mm)</label><input type="number" id="cfgDepth" value="65"></div>
+      <div class="input-field"><label>💥 Max Vibration (G-Force)</label><input type="number" id="cfgG" value="4.2" step="0.1"></div>
+      <div class="input-field"><label>⏱️ Update Interval (ms)</label><input type="number" id="cfgInterval" value="1000"></div>
+
+      <div style="display: flex; gap: 8px; margin-top: 12px;">
+        <button class="btn" style="flex: 1; justify-content: center;" onclick="saveStudioAndLaunch()">🚀 Save & Launch</button>
+        <button class="btn btn-alt" style="flex: 1; justify-content: center;" onclick="closeStudioView()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. REAL-TIME CLOCK & BATTERY API ---
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('headerTime').innerText = now.toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function initBatteryAPI() {
+      const batVal = document.getElementById('batteryVal');
+      if ('getBattery' in navigator) {
+        navigator.getBattery().then(battery => {
+          function updateBatUI() {
+            const level = Math.round(battery.level * 100);
+            const charging = battery.charging ? ' ⚡' : ' 🔋';
+            batVal.innerText = `${level}%${charging}`;
+          }
+          updateBatUI();
+          battery.addEventListener('levelchange', updateBatUI);
+          battery.addEventListener('chargingchange', updateBatUI);
+        });
+      } else {
+        batVal.innerText = `88% 🔋`;
+      }
+    }
+    initBatteryAPI();
+
+    // --- 2. ESP32-CAM CONTROLLER & GIMBAL ---
+    function connectEspCam() {
+      let url = document.getElementById('camIpInput').value.trim();
+      if(!url) return alert("कृपया ESP32-CAM का सही IP दर्ज करें!");
+      if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'http://' + url;
+      if (!url.includes('/stream') && !url.includes(':')) url += '/stream';
+
+      const img = document.getElementById('espCamStream');
+      const radar = document.getElementById('radarUi');
+      const badge = document.getElementById('camStatusBadge');
+
+      img.src = url;
+      img.style.display = 'block';
+      radar.style.display = 'none';
+      badge.innerText = "● LIVE STREAMING";
+      badge.style.color = "#10b981";
+    }
+
+    function stopCamStream() {
+      const img = document.getElementById('espCamStream');
+      const radar = document.getElementById('radarUi');
+      const badge = document.getElementById('camStatusBadge');
+
+      img.src = "";
+      img.style.display = 'none';
+      radar.style.display = 'flex';
+      badge.innerText = "● RADAR ACTIVE";
+      badge.style.color = "#00f2fe";
+    }
+
+    function onStreamError() {
+      document.getElementById('camStatusBadge').innerText = "⚠️ STREAM OFFLINE";
+      document.getElementById('camStatusBadge').style.color = "#ef4444";
+      stopCamStream();
+    }
+
+    let servoTimer = null;
+    function onPanTiltChange() {
+      const pan = document.getElementById('panSlider').value;
+      const tilt = document.getElementById('tiltSlider').value;
+      document.getElementById('panDegreeVal').innerText = pan + "°";
+      document.getElementById('tiltDegreeVal').innerText = tilt + "°";
+
+      // Send Command to ESP32 Hardware
+      const ip = document.getElementById('camIpInput').value.trim();
+      if (ip) {
+        clearTimeout(servoTimer);
+        servoTimer = setTimeout(() => {
+          let baseUrl = ip.startsWith('http') ? ip : 'http://' + ip;
+          baseUrl = baseUrl.replace('/stream', '');
+          fetch(`${baseUrl}/servo?pan=${pan}&tilt=${tilt}`).catch(() => {});
+        }, 150);
+      }
+    }
+
+    // --- 3. MAP ENGINE & MY LOCATION GEOLOCATION ---
+    let currentLat = 28.6139, currentLng = 77.2090;
+    let currentHeading = 0;
+
+    const cityLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+    const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+    const surveyLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 });
+
+    const map = L.map('map', { zoomControl: true, layers: [cityLayer] }).setView([currentLat, currentLng], 14);
+
+    const roverMarker = L.circleMarker([currentLat, currentLng], {
+      radius: 9, fillColor: "#00f2fe", color: "#ffffff", weight: 2.5, fillOpacity: 0.95
+    }).addTo(map);
+
+    let heatDataPoints = [];
+    const heatLayer = L.heatLayer(heatDataPoints, { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
+
+    function switchMapLayer(mode) {
+      map.removeLayer(cityLayer); map.removeLayer(satLayer); map.removeLayer(surveyLayer);
+      document.querySelectorAll('.map-btn').forEach(b => b.classList.remove('active'));
+
+      if (mode === 'sat') { map.addLayer(satLayer); document.getElementById('btnMapSat').classList.add('active'); }
+      else if (mode === 'survey') { map.addLayer(surveyLayer); document.getElementById('btnMapSurvey').classList.add('active'); }
+      else { map.addLayer(cityLayer); document.getElementById('btnMapCity').classList.add('active'); }
+    }
+
+    function locateUserPosition() {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(position => {
+          currentLat = position.coords.latitude;
+          currentLng = position.coords.longitude;
+          roverMarker.setLatLng([currentLat, currentLng]);
+          map.setView([currentLat, currentLng], 16);
+          document.getElementById('gpsCoordText').innerText = `${currentLat.toFixed(4)}° N, ${currentLng.toFixed(4)}° E`;
+          document.getElementById('cfgLat').value = currentLat.toFixed(4);
+          document.getElementById('cfgLng').value = currentLng.toFixed(4);
+          alert("📍 आपकी लाइव GPS लोकेशन पिन-पॉइंट कर दी गई है!");
+        }, err => {
+          // Graceful fallback for local content:// or blocked permissions
+          alert("📍 ब्राउज़र सिक्योरिटी (local file/content://) के कारण लाइव GPS ब्लॉक है। डिफ़ॉल्ट / सेट की गई लोकेशन यूज़ हो रही है।\nविवरण: " + err.message);
+          map.setView([currentLat, currentLng], 15);
+          document.getElementById('gpsCoordText').innerText = `${currentLat.toFixed(4)}° N, ${currentLng.toFixed(4)}° E`;
+        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+      } else {
+        alert("आपका डिवाइस जियोलोकेशन सपोर्ट नहीं करता है।");
+      }
+    }
+
+    // --- 4. CHART.JS GRAPH ---
+    const ctx = document.getElementById('vibeChartCanvas').getContext('2d');
+    const vibeChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Vibration (G)',
+          data: [],
+          borderColor: '#a855f7',
+          borderWidth: 2,
+          pointRadius: 2,
+          pointBackgroundColor: '#00f2fe',
+          fill: true,
+          backgroundColor: 'rgba(168, 85, 247, 0.15)',
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#64748b', font: { size: 8 } }, grid: { display: false } },
+          y: { min: 0, max: 5, ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // --- 5. THREE.JS 3D ROVER ORIENTATION MODEL ---
+    const container3d = document.getElementById('orientation3d');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, container3d.clientWidth / container3d.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    
+    renderer.setSize(container3d.clientWidth, container3d.clientHeight);
+    container3d.appendChild(renderer.domElement);
+
+    const roverGroup = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00f2fe, metalness: 0.8, roughness: 0.2 });
+    roverGroup.add(new THREE.Mesh(new THREE.BoxGeometry(2, 0.35, 1.1), bodyMat));
+
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, wireframe: true });
+    const domeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), domeMat);
+    domeMesh.position.set(0.3, 0.3, 0);
+    roverGroup.add(domeMesh);
+
+    scene.add(roverGroup);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    dirLight.position.set(3, 5, 4);
+    scene.add(dirLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    camera.position.set(2.8, 2.2, 3.2);
+    camera.lookAt(0, 0, 0);
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      renderer.render(scene, camera);
+    }
+    animate3D();
+
+    window.addEventListener('resize', () => {
+      if(container3d.clientWidth > 0 && container3d.clientHeight > 0) {
+        camera.aspect = container3d.clientWidth / container3d.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container3d.clientWidth, container3d.clientHeight);
+      }
+      map.invalidateSize();
+    });
+
+    // --- 6. REALTIME TELEMETRY ENGINE & RESETS ---
+    let potholeLogDatabase = [];
+    let isSimulating = false, simTimer = null;
+    let simMaxDepth = 65, simMaxG = 4.2, simIntervalMs = 1000;
+    let obsCounter = 0;
+    let healthyCount = 0, fairCount = 0, poorCount = 0, badCount = 0;
+
+    function getCompassText(deg) {
+      const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      return `${Math.round(deg)}° (${directions[Math.round(deg / 45) % 8]})`;
+    }
+
+    function processTelemetry(data) {
+      obsCounter++;
+      const { lat, lng, depth, vibe, pitch, roll, speed, temp, timestamp, heading } = data;
+
+      // Update 3D Gyro Rover
+      roverGroup.rotation.x = pitch * (Math.PI / 180);
+      roverGroup.rotation.z = roll * (Math.PI / 180);
+
+      // Update Position & Compass
+      const pos = [lat, lng];
+      roverMarker.setLatLng(pos);
+      map.panTo(pos);
+      document.getElementById('compassHeadingText').innerText = getCompassText(heading);
+
+      // Dynamic Score Calc
+      let score = Math.max(0, Math.round(100 - (depth * 0.85 + vibe * 8)));
+
+      let statusText = "GOOD", statusClass = "sev-good", colorCode = "#10b981";
+      if (score >= 80) { statusText = "GOOD CONDITION"; statusClass = "sev-good"; colorCode = "#10b981"; healthyCount++; }
+      else if (score >= 60) { statusText = "FAIR CONDITION"; statusClass = "sev-fair"; colorCode = "#f59e0b"; fairCount++; }
+      else if (score >= 40) { statusText = "POOR CONDITION"; statusClass = "sev-poor"; colorCode = "#f97316"; poorCount++; }
+      else { statusText = "BAD / SEVERE DAMAGE"; statusClass = "sev-bad"; colorCode = "#ef4444"; badCount++; }
+
+      // Update Sensor & Analytics Card
+      document.getElementById('valVibe').innerText = vibe.toFixed(2) + " g";
+      document.getElementById('valTemp').innerText = temp.toFixed(1) + " °C";
+      document.getElementById('valSpeed').innerText = speed + " km/h";
+      document.getElementById('valGyro').innerText = `${pitch.toFixed(1)}° / ${roll.toFixed(1)}°`;
+      document.getElementById('gpsCoordText').innerText = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`;
+
+      document.getElementById('liveSegmentScore').innerText = `${score} / 100`;
+      document.getElementById('liveSegmentScore').style.color = colorCode;
+      document.getElementById('liveConfidence').innerText = `0.94 (94%)`;
+      document.getElementById('liveTrend').innerText = score >= 60 ? "Stable 📈" : "Deteriorating 📉";
+      document.getElementById('liveTrend').style.color = colorCode;
+      document.getElementById('totalObsCount').innerText = `${obsCounter} Records`;
+
+      // Scope Gauge UI
+      document.getElementById('rhiVal').innerText = score;
+      document.getElementById('rhiVal').style.color = colorCode;
+      const deg = (score / 100) * 360;
+      document.getElementById('rhiGauge').style.background = `conic-gradient(${colorCode} 0deg ${deg}deg, rgba(255,255,255,0.08) ${deg}deg 360deg)`;
+
+      const totalPct = healthyCount + fairCount + poorCount + badCount;
+      if (totalPct > 0) {
+        document.getElementById('pctHealthy').innerText = Math.round((healthyCount / totalPct) * 100) + "%";
+        document.getElementById('pctFair').innerText = Math.round((fairCount / totalPct) * 100) + "%";
+        document.getElementById('pctPoor').innerText = Math.round((poorCount / totalPct) * 100) + "%";
+        document.getElementById('pctBad').innerText = Math.round((badCount / totalPct) * 100) + "%";
+      }
+
+      // Graph Update
+      vibeChart.data.labels.push(timestamp);
+      vibeChart.data.datasets[0].data.push(vibe);
+      if (vibeChart.data.labels.length > 15) {
+        vibeChart.data.labels.shift();
+        vibeChart.data.datasets[0].data.shift();
+      }
+      vibeChart.update();
+
+      // Log Event
+      if (score < 85) {
+        heatDataPoints.push([lat, lng, (100 - score) / 100]);
+        heatLayer.setLatLngs(heatDataPoints);
+
+        const circle = L.circleMarker(pos, {
+          radius: 6, fillColor: colorCode, color: "#ffffff", weight: 1.5, fillOpacity: 0.9
+        }).addTo(map);
+        circle.bindPopup(`<b>${statusText}</b><br>Score: ${score}<br>Depth: ${depth}mm`);
+
+        potholeLogDatabase.unshift({ timestamp, lat, lng, depth, vibe, score, statusText });
+
+        const placeholder = document.getElementById('emptyRowPlaceholder');
+        if (placeholder) placeholder.remove();
+
+        const tbody = document.getElementById('potholeTable').getElementsByTagName('tbody')[0];
+        const row = tbody.insertRow(0);
+        row.innerHTML = `<td>${timestamp}</td><td>${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</td><td>${depth} mm</td><td>${vibe.toFixed(1)} G</td><td style="color:${colorCode}; font-weight:bold;">${score}</td><td class="${statusClass}">${statusText}</td>`;
+
+        const recentBody = document.getElementById('recentEventsBody');
+        if (recentBody.innerText.includes("No live telemetry")) recentBody.innerHTML = "";
+        const miniRow = `<tr><td>B-204</td><td style="color:${colorCode};">${statusText.split(' ')[0]}</td><td>${(Math.random()*5).toFixed(1)} km</td><td style="color:${colorCode};">${score}</td></tr>`;
+        recentBody.innerHTML = miniRow + recentBody.innerHTML;
+        if(recentBody.children.length > 4) recentBody.removeChild(recentBody.lastChild);
+      }
+    }
+
+    function toggleSimulation() {
+      if (isSimulating) {
+        // Stop Simulation
+        isSimulating = false;
+        clearInterval(simTimer);
+        simTimer = null;
+
+        const btn = document.getElementById('simToggleBtn');
+        btn.innerText = "🚀 Launch Simulation";
+        btn.classList.remove('btn-danger');
+
+        document.getElementById('gnssStatus').innerText = "Standby 🛰️";
+        document.getElementById('navicRecvState').innerText = "Standby 🟡";
+        document.getElementById('navicRecvState').style.color = "var(--neon-yellow)";
+        document.getElementById('telemetryPipeState').innerText = "Paused ⏸️";
+        document.getElementById('telemetryPipeState').style.color = "var(--text-mute)";
+      } else {
+        // Start Simulation
+        isSimulating = true;
+        const btn = document.getElementById('simToggleBtn');
+        btn.innerText = "🛑 Stop Simulation";
+        btn.classList.add('btn-danger');
+
+        document.getElementById('gnssStatus').innerText = "Connected 📶";
+        document.getElementById('navicRecvState').innerText = "Locked 🟢";
+        document.getElementById('navicRecvState').style.color = "var(--neon-green)";
+        document.getElementById('telemetryPipeState').innerText = "Active 🌐";
+        document.getElementById('telemetryPipeState').style.color = "var(--neon-cyan)";
+
+        simTimer = setInterval(() => {
+          currentLat += 0.00005;
+          currentLng += 0.00007;
+          currentHeading = (currentHeading + 5) % 360;
+
+          const isAnomaly = Math.random() > 0.4;
+          const depth = isAnomaly ? Math.floor(Math.random() * simMaxDepth) + 15 : Math.floor(Math.random() * 5);
+          const vibe = isAnomaly ? (Math.random() * simMaxG + 1.2) : (Math.random() * 0.4 + 0.2);
+          const pitch = isAnomaly ? (Math.random() * 14 - 7) : 0;
+          const roll = isAnomaly ? (Math.random() * 14 - 7) : 0;
+          const speed = Math.floor(Math.random() * 12) + 40;
+          const temp = 32.0 + (Math.random() * 1.2 - 0.6);
+
+          processTelemetry({
+            lat: currentLat, lng: currentLng, depth, vibe, pitch, roll, speed, temp,
+            heading: currentHeading, timestamp: new Date().toLocaleTimeString()
+          });
+        }, simIntervalMs);
+      }
+    }
+
+    // --- RESET FUNCTIONS ---
+    function resetSection2() {
+      document.getElementById('liveSegmentScore').innerText = "-- / 100";
+      document.getElementById('liveSegmentScore').style.color = "var(--text-mute)";
+      document.getElementById('liveConfidence').innerText = "--";
+      document.getElementById('liveTrend').innerText = "Standby ⏸️";
+      document.getElementById('liveTrend').style.color = "var(--text-mute)";
+      document.getElementById('totalObsCount').innerText = "0 Records";
+      document.getElementById('recentEventsBody').innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-mute);">No live telemetry events</td></tr>';
+      obsCounter = 0;
+    }
+
+    function resetSection4() {
+      document.getElementById('valVibe').innerText = "0.00 g";
+      document.getElementById('valTemp').innerText = "-- °C";
+      document.getElementById('valSpeed').innerText = "0 km/h";
+      document.getElementById('valGyro').innerText = "0° / 0°";
+
+      vibeChart.data.labels = [];
+      vibeChart.data.datasets[0].data = [];
+      vibeChart.update();
+
+      roverGroup.rotation.x = 0;
+      roverGroup.rotation.z = 0;
+    }
+
+    function resetSection5() {
+      document.getElementById('rhiVal').innerText = "--";
+      document.getElementById('rhiVal').style.color = "var(--text-mute)";
+      document.getElementById('rhiGauge').style.background = `conic-gradient(rgba(255,255,255,0.08) 0deg 360deg)`;
+      document.getElementById('pctHealthy').innerText = "0%";
+      document.getElementById('pctFair').innerText = "0%";
+      document.getElementById('pctPoor').innerText = "0%";
+      document.getElementById('pctBad').innerText = "0%";
+      healthyCount = 0; fairCount = 0; poorCount = 0; badCount = 0;
+    }
+
+    function resetSection6() {
+      potholeLogDatabase = [];
+      document.getElementById('potholeTable').getElementsByTagName('tbody')[0].innerHTML = '<tr id="emptyRowPlaceholder"><td colspan="6" style="text-align:center; color:var(--text-mute);">Log is empty. Start simulation or live ESP32 GPS connection to populate.</td></tr>';
+    }
+
+    function resetAllDashboardData() {
+      if (isSimulating) toggleSimulation();
+      resetSection2();
+      resetSection4();
+      resetSection5();
+      resetSection6();
+
+      heatDataPoints = [];
+      heatLayer.setLatLngs([]);
+      alert("🧹 पूरा डैशबोर्ड डेटा और लॉग्स रिसेट कर दिए गए हैं!");
+    }
+
+    // --- MODAL & CSV EXPORT ---
+    function openStudioView() { document.getElementById('simStudioView').style.display = 'block'; }
+    function closeStudioView() { 
+      document.getElementById('simStudioView').style.display = 'none'; 
+      setTimeout(() => map.invalidateSize(), 300); 
+    }
+
+    function saveStudioAndLaunch() {
+      currentLat = parseFloat(document.getElementById('cfgLat').value) || 28.6139;
+      currentLng = parseFloat(document.getElementById('cfgLng').value) || 77.2090;
+      simMaxDepth = parseInt(document.getElementById('cfgDepth').value) || 65;
+      simMaxG = parseFloat(document.getElementById('cfgG').value) || 4.2;
+      simIntervalMs = parseInt(document.getElementById('cfgInterval').value) || 1000;
+
+      // Update Map View
+      roverMarker.setLatLng([currentLat, currentLng]);
+      map.setView([currentLat, currentLng], 15);
+      document.getElementById('gpsCoordText').innerText = `${currentLat.toFixed(4)}° N, ${currentLng.toFixed(4)}° E`;
+
+      closeStudioView();
+
+      // Restart Simulation with New Config
+      if (isSimulating) {
+        toggleSimulation(); // Stop
+      }
+      toggleSimulation(); // Launch Fresh
+    }
+
+    function exportGPSCSV() {
+      if (potholeLogDatabase.length === 0) return alert("निर्यात करने के लिए कोई नया डेटा नहीं है!");
+      let csv = "Timestamp,Latitude,Longitude,Depth_mm,G_Force,Road_Score,Status\n";
+      potholeLogDatabase.forEach(item => {
+        csv += `${item.timestamp},${item.lat},${item.lng},${item.depth},${item.vibe},${item.score},${item.statusText}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = window.URL.createObjectURL(blob);
+      a.download = `ROAD_SENSE_TELEMETRY_${Date.now()}.csv`;
+      a.click();
+    }
+  </script>
+</body>
+</html>
